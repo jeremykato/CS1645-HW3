@@ -10,7 +10,24 @@ double global_sum, dx;
 int iterations_per_thread;
 pthread_mutex_t mutex;
 
-void *thread_calculate() {
+void* thread_calculate(void* parameter) {
+
+  double x = *((double) parameter),
+         local_sum = 0.0,
+         p1 = 0.0,
+         p2 = FUNCTION(start);
+
+  int i;
+  for (i = 0; i < iterations_per_thread; i++) {
+    p1 = p2;
+    p2 = FUNCTION(x);
+    local_sum += ((p2 - p1) / 2) * dx;
+    x += dx;
+  }
+
+  pthread_mutex_lock(&mutex);
+  global_sum += local_sum;
+  pthread_mutex_unlock(&mutex);
 
 }
 
@@ -35,8 +52,8 @@ int main(int argc, char* argv[]) {
 
   double domain_start = DOMAIN_START, // start of each thread's domain
          domain_inc   = (DOMAIN_END - DOMAIN_START) / ((double) threads); // distance between domains divided by number of threads
-  iterations_per_thread = total_iterations / threads;  // calculate how many iterations each thread performs
   dx = domain_inc / iterations_per_thread; // how much to increase by each iteration
+  iterations_per_thread = total_iterations / threads;  // calculate how many iterations each thread performs
 
   pthread_mutex_init(&mutex);
   pthread_t *threads = calloc(threads, sizeof(pthread_t));
@@ -46,6 +63,7 @@ int main(int argc, char* argv[]) {
   for (p = 0; p < threads; p++) {
     params[p] = domain_start;
     pthread_create((threads + p), NULL, &thread_calculate, (params + p));
+    domain_start += domain_inc;
   }
 
   for (p = 0; p < threads; p++) {
